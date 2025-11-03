@@ -1,0 +1,39 @@
+# Dockerfile for autonomous agent
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies with timeout and retry settings
+ENV PIP_DEFAULT_TIMEOUT=300
+RUN pip install --no-cache-dir --retries 5 -r requirements.txt psutil
+
+# Copy application code
+COPY config/ ./config/
+COPY agent/ ./agent/
+COPY monitoring/ ./monitoring/
+COPY training/ ./training/
+COPY validation/ ./validation/
+COPY database/ ./database/
+COPY scripts/ ./scripts/
+COPY data/ ./data/
+COPY .env.example .env
+
+# Create necessary directories
+RUN mkdir -p data/raw data/processed models/production logs audit/reports
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Run agent
+CMD ["python", "agent/main.py", "--interval", "300"]

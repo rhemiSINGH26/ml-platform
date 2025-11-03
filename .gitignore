@@ -1,0 +1,130 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data files (tracked by DVC)
+data/raw/*.csv
+data/raw/*.parquet
+data/processed/*.csv
+data/processed/*.parquet
+data/reference/*.csv
+*.dvc
+!*.dvc
+
+# Model artifacts (tracked by DVC)
+models/production/*.pkl
+models/production/*.joblib
+models/production/*.h5
+models/staging/*.pkl
+models/staging/*.joblib
+models/archive/*.pkl
+
+# MLflow
+mlruns/
+mlflow.db
+mlartifacts/
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+
+# Logs
+logs/*.log
+*.log
+audit/*.db
+
+# Reports
+audit/reports/*.pdf
+audit/reports/*.html
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Great Expectations
+validation/great_expectations/uncommitted/
+validation/great_expectations/plugins/
+
+# Prometheus data
+prometheus_data/
+
+# Docker
+.dockerignore
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/
+
+# Large files
+*.tar.gz
+*.zip
+*.rar

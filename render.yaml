@@ -1,0 +1,144 @@
+# Render Blueprint Configuration for MLOps Platform
+# Deploy entire platform to Render.com with one click
+
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: mlops-postgres
+    env: docker
+    plan: starter  # $7/month - upgrade to standard for production
+    region: oregon  # Choose closest to your users
+    envVars:
+      - key: POSTGRES_USER
+        value: mlops
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_DB
+        value: mlops
+    disk:
+      name: mlops-postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 10
+
+  # MLflow Tracking Server
+  - type: web
+    name: mlops-mlflow
+    env: docker
+    dockerfilePath: ./Dockerfile.mlflow
+    plan: starter
+    region: oregon
+    envVars:
+      - key: MLFLOW_BACKEND_STORE_URI
+        fromDatabase:
+          name: mlops-postgres
+          property: connectionString
+      - key: MLFLOW_ARTIFACT_ROOT
+        value: /mlflow/artifacts
+    disk:
+      name: mlflow-artifacts
+      mountPath: /mlflow/artifacts
+      sizeGB: 20
+    healthCheckPath: /health
+
+  # FastAPI Service
+  - type: web
+    name: mlops-api
+    env: docker
+    dockerfilePath: ./Dockerfile.api
+    plan: starter
+    region: oregon
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mlops-postgres
+          property: connectionString
+      - key: MLFLOW_TRACKING_URI
+        fromService:
+          name: mlops-mlflow
+          type: web
+          property: host
+      - key: API_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ENABLE_API_AUTH
+        value: true
+      - key: SMTP_ENABLED
+        value: false  # Set to true after configuring email
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: SLACK_ENABLED
+        value: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Streamlit Dashboard
+  - type: web
+    name: mlops-ui
+    env: docker
+    dockerfilePath: ./Dockerfile.ui
+    plan: starter
+    region: oregon
+    envVars:
+      - key: API_URL
+        fromService:
+          name: mlops-api
+          type: web
+          property: host
+      - key: MLFLOW_TRACKING_URI
+        fromService:
+          name: mlops-mlflow
+          type: web
+          property: host
+      - key: ENVIRONMENT
+        value: production
+    healthCheckPath: /_stcore/health
+    autoDeploy: true
+
+  # Autonomous Agent (Background Worker)
+  - type: worker
+    name: mlops-agent
+    env: docker
+    dockerfilePath: ./Dockerfile.agent
+    plan: starter
+    region: oregon
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mlops-postgres
+          property: connectionString
+      - key: MLFLOW_TRACKING_URI
+        fromService:
+          name: mlops-mlflow
+          type: web
+          property: host
+      - key: API_URL
+        fromService:
+          name: mlops-api
+          type: web
+          property: host
+      - key: AGENT_ENABLED
+        value: true
+      - key: AGENT_AUTO_EXECUTE_SAFE
+        value: true
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+    autoDeploy: true
+
+databases:
+  - name: mlops-postgres
+    databaseName: mlops
+    user: mlops
+    plan: starter

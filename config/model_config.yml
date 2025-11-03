@@ -1,0 +1,172 @@
+# Model Training Configuration
+# This file defines hyperparameters and settings for all models
+
+# Global training settings
+training:
+  random_seed: 42
+  n_jobs: -1  # Use all CPU cores
+  verbosity: 1
+  
+# Feature engineering
+features:
+  scaling: "standard"  # Options: standard, minmax, robust, none
+  handle_missing: "median"  # Options: mean, median, mode, drop
+  encode_categorical: "onehot"  # Options: onehot, label, target
+  
+# Model selection criteria
+selection:
+  primary_metric: "f1_score"  # Primary metric for model selection
+  secondary_metrics:
+    - "accuracy"
+    - "roc_auc"
+    - "precision"
+    - "recall"
+  minimum_threshold: 0.75  # Minimum acceptable F1 score
+  require_all_metrics: false  # If true, all metrics must meet threshold
+  
+# Cross-validation settings
+cross_validation:
+  enabled: true
+  n_folds: 5
+  stratified: true  # Maintain class distribution
+  shuffle: true
+  
+# Models to train
+models:
+  
+  # Logistic Regression (Baseline)
+  logistic_regression:
+    enabled: true
+    priority: 1  # Lower number = higher priority
+    hyperparameters:
+      C: 1.0
+      penalty: "l2"
+      solver: "lbfgs"
+      max_iter: 1000
+      class_weight: "balanced"
+      random_state: 42
+    description: "Linear model - fast, interpretable baseline"
+    
+  # Random Forest
+  random_forest:
+    enabled: true
+    priority: 2
+    hyperparameters:
+      n_estimators: 100
+      max_depth: 10
+      min_samples_split: 5
+      min_samples_leaf: 2
+      max_features: "sqrt"
+      class_weight: "balanced"
+      random_state: 42
+      n_jobs: -1
+    description: "Ensemble method - robust, handles non-linearity"
+    
+  # XGBoost
+  xgboost:
+    enabled: true
+    priority: 3
+    hyperparameters:
+      n_estimators: 100
+      max_depth: 6
+      learning_rate: 0.1
+      subsample: 0.8
+      colsample_bytree: 0.8
+      gamma: 0
+      min_child_weight: 1
+      reg_alpha: 0
+      reg_lambda: 1
+      random_state: 42
+      n_jobs: -1
+      eval_metric: "logloss"
+    description: "Gradient boosting - often best performance"
+    
+  # LightGBM
+  lightgbm:
+    enabled: true
+    priority: 4
+    hyperparameters:
+      n_estimators: 100
+      max_depth: 6
+      learning_rate: 0.1
+      num_leaves: 31
+      subsample: 0.8
+      colsample_bytree: 0.8
+      min_child_samples: 20
+      reg_alpha: 0
+      reg_lambda: 1
+      random_state: 42
+      n_jobs: -1
+      verbose: -1
+    description: "Fast gradient boosting - efficient for large datasets"
+    
+# Hyperparameter tuning (optional, for future enhancement)
+hyperparameter_tuning:
+  enabled: false
+  method: "random_search"  # Options: grid_search, random_search, bayesian
+  n_iter: 50  # For random search
+  cv_folds: 3
+  scoring: "f1"
+  
+# Model evaluation
+evaluation:
+  # Metrics to calculate
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "roc_auc"
+    - "confusion_matrix"
+    - "classification_report"
+    - "pr_auc"  # Precision-Recall AUC
+    
+  # Plots to generate
+  plots:
+    - "confusion_matrix"
+    - "roc_curve"
+    - "precision_recall_curve"
+    - "feature_importance"
+    - "learning_curve"
+    
+  # Class imbalance handling
+  class_weight: "balanced"
+  
+# MLflow logging
+mlflow:
+  log_params: true
+  log_metrics: true
+  log_model: true
+  log_artifacts: true
+  log_plots: true
+  log_feature_importance: true
+  log_code: false  # Set to true to log source code
+  
+  # Auto-tagging
+  tags:
+    project: "heart_disease_classification"
+    framework: "scikit-learn"
+    
+# Early stopping (for gradient boosting models)
+early_stopping:
+  enabled: true
+  patience: 10
+  min_delta: 0.001
+  
+# Model registry
+registry:
+  auto_register: true
+  production_threshold: 0.80  # F1 score needed for production
+  staging_threshold: 0.75  # F1 score needed for staging
+  archive_old_models: true
+  max_production_models: 3  # Keep last N production models
+  
+# Retraining triggers
+retraining:
+  on_drift: true
+  drift_threshold: 0.7
+  on_performance_degradation: true
+  performance_threshold: 0.1  # 10% drop in F1
+  min_days_between_retraining: 1
+  scheduled_retraining: true
+  schedule: "0 0 * * 0"  # Weekly on Sunday at midnight (cron format)

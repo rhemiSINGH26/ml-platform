@@ -1,0 +1,35 @@
+# Dockerfile for MLflow Tracking Server
+FROM python:3.10-slim
+
+WORKDIR /mlflow
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install MLflow and dependencies with timeout and retry settings
+ENV PIP_DEFAULT_TIMEOUT=300
+RUN pip install --no-cache-dir --retries 5 \
+    mlflow==2.8.0 \
+    psycopg2-binary \
+    boto3
+
+# Create directories for artifacts
+RUN mkdir -p /mlflow/artifacts
+
+# Expose MLflow port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health').read()" || exit 1
+
+# Start MLflow server
+CMD mlflow server \
+    --backend-store-uri ${MLFLOW_BACKEND_STORE_URI:-sqlite:///mlflow.db} \
+    --default-artifact-root ${MLFLOW_ARTIFACT_ROOT:-/mlflow/artifacts} \
+    --host 0.0.0.0 \
+    --port 5000

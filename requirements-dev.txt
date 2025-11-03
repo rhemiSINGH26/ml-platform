@@ -1,0 +1,85 @@
+# Development dependencies for MLOps platform
+# Install with: pip install -r requirements-dev.txt
+
+# Include base requirements
+-r requirements.txt
+
+# ============================================================
+# Testing
+# ============================================================
+pytest>=7.4.0,<8.0.0
+pytest-cov>=4.1.0,<5.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-mock>=3.12.0,<4.0.0
+pytest-xdist>=3.5.0  # Parallel test execution
+pytest-timeout>=2.2.0  # Test timeouts
+httpx>=0.25.0  # For testing FastAPI
+faker>=20.0.0  # Generate fake data for tests
+
+# ============================================================
+# Code quality and linting
+# ============================================================
+black>=23.11.0,<24.0.0  # Code formatter
+ruff>=0.1.0,<1.0.0  # Fast linter
+isort>=5.12.0,<6.0.0  # Import sorting
+mypy>=1.7.0,<2.0.0  # Type checking
+pylint>=3.0.0,<4.0.0  # Code analysis
+flake8>=6.1.0,<7.0.0  # Style guide enforcement
+bandit>=1.7.5,<2.0.0  # Security linting
+
+# ============================================================
+# Type stubs for mypy
+# ============================================================
+types-requests>=2.31.0
+types-PyYAML>=6.0.0
+types-python-dateutil>=2.8.0
+pandas-stubs>=2.0.0
+
+# ============================================================
+# Documentation
+# ============================================================
+mkdocs>=1.5.0,<2.0.0
+mkdocs-material>=9.4.0,<10.0.0
+mkdocstrings[python]>=0.24.0,<1.0.0
+
+# ============================================================
+# Notebook support
+# ============================================================
+jupyter>=1.0.0,<2.0.0
+jupyterlab>=4.0.0,<5.0.0
+ipykernel>=6.26.0,<7.0.0
+ipywidgets>=8.1.0,<9.0.0
+
+# ============================================================
+# Development tools
+# ============================================================
+pre-commit>=3.5.0,<4.0.0  # Git hooks
+watchdog>=3.0.0,<4.0.0  # File system monitoring
+python-dotenv-cli>=0.1.0  # CLI for .env files
+
+# ============================================================
+# Profiling and debugging
+# ============================================================
+line-profiler>=4.1.0,<5.0.0
+memory-profiler>=0.61.0,<1.0.0
+py-spy>=0.3.14  # Sampling profiler
+ipdb>=0.13.13  # IPython debugger
+
+# ============================================================
+# API documentation
+# ============================================================
+pdoc3>=0.10.0  # API docs generator
+
+# ============================================================
+# Data exploration
+# ============================================================
+sweetviz>=2.3.0  # Automated EDA
+ydata-profiling>=4.5.0  # Pandas profiling
+
+# ============================================================
+# Build and packaging
+# ============================================================
+build>=1.0.0,<2.0.0
+twine>=4.0.0,<5.0.0
+setuptools>=68.0.0
+wheel>=0.41.0

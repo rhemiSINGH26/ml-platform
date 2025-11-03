@@ -1,0 +1,145 @@
+name: Scheduled Model Retraining
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create directories
+      run: |
+        mkdir -p data/raw data/processed models/production logs mlruns
+    
+    - name: Download latest data
+      run: |
+        python scripts/download_data.py
+    
+    - name: Validate data
+      run: |
+        python -c "
+        from validation.data_validator import DataValidator
+        from validation.schema_definitions import HEART_DISEASE_SCHEMA, VALIDATION_RULES
+        import pandas as pd
+        
+        df = pd.read_csv('data/raw/heart_disease.csv')
+        validator = DataValidator(HEART_DISEASE_SCHEMA, VALIDATION_RULES)
+        is_valid, errors = validator.validate_all(df)
+        
+        if not is_valid:
+            print('Data validation failed!')
+            for error in errors:
+                print(f'  - {error}')
+            exit(1)
+        print('Data validation passed!')
+        "
+    
+    - name: Run training pipeline
+      env:
+        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      run: |
+        python training/train_pipeline.py \
+          --experiment-name "scheduled_retrain" \
+          --run-name "retrain_$(date +%Y%m%d_%H%M%S)"
+    
+    - name: Check model performance
+      run: |
+        python -c "
+        import json
+        from pathlib import Path
+        
+        # Load latest model metadata
+        metadata_files = list(Path('models/production').glob('*_metadata.yaml'))
+        if not metadata_files:
+            print('No model metadata found!')
+            exit(1)
+        
+        import yaml
+        latest_metadata = max(metadata_files, key=lambda p: p.stat().st_mtime)
+        with open(latest_metadata) as f:
+            metadata = yaml.safe_load(f)
+        
+        # Check F1 score threshold
+        f1_score = metadata['metrics'].get('f1_score', 0.0)
+        threshold = 0.75
+        
+        print(f'Model F1 Score: {f1_score:.4f}')
+        print(f'Threshold: {threshold:.4f}')
+        
+        if f1_score < threshold:
+            print('WARNING: Model performance below threshold!')
+            exit(1)
+        
+        print('Model performance acceptable!')
+        "
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: trained-model
+        path: |
+          models/production/
+          audit/reports/
+        retention-days: 90
+    
+    - name: Deploy new model
+      if: success()
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        RENDER_SERVICE_ID_API: ${{ secrets.RENDER_SERVICE_ID_API }}
+      run: |
+        # Trigger API service restart to load new model
+        curl -X POST \
+          "https://api.render.com/v1/services/${RENDER_SERVICE_ID_API}/deploys" \
+          -H "Authorization: Bearer ${RENDER_API_KEY}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": true}'
+    
+    - name: Send notification
+      if: always()
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      run: |
+        STATUS="${{ job.status }}"
+        MESSAGE="Scheduled model retraining completed with status: $STATUS"
+        
+        curl -X POST ${SLACK_WEBHOOK} \
+          -H 'Content-Type: application/json' \
+          -d "{\"text\": \"$MESSAGE\"}"
+      continue-on-error: true
+    
+    - name: Create GitHub Release
+      if: success()
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: model-v${{ github.run_number }}
+        release_name: Model Release v${{ github.run_number }}
+        body: |
+          Automated model retraining completed successfully.
+          
+          **Training Date:** ${{ github.event.repository.updated_at }}
+          **Trigger:** Scheduled (weekly)
+          
+          Check the artifacts for model files and reports.
+        draft: false
+        prerelease: false
+      continue-on-error: true

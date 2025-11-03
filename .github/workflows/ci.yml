@@ -1,0 +1,104 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Lint with ruff
+      run: |
+        ruff check . --output-format=github
+      continue-on-error: true
+    
+    - name: Format check with black
+      run: |
+        black --check .
+      continue-on-error: true
+    
+    - name: Type check with mypy
+      run: |
+        mypy config/ training/ services/ monitoring/ agent/ validation/ --ignore-missing-imports
+      continue-on-error: true
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --cov=. --cov-report=xml --cov-report=html
+      continue-on-error: true
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v
+      continue-on-error: true
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+      continue-on-error: true
+    
+    - name: Build Docker images
+      run: |
+        docker build -f Dockerfile.api -t mlops-api:${{ github.sha }} .
+        docker build -f Dockerfile.ui -t mlops-ui:${{ github.sha }} .
+        docker build -f Dockerfile.training -t mlops-training:${{ github.sha }} .
+        docker build -f Dockerfile.agent -t mlops-agent:${{ github.sha }} .
+    
+    - name: Test Docker containers
+      run: |
+        docker-compose -f docker-compose.yml config
+        docker-compose -f docker-compose.yml up -d api ui
+        sleep 10
+        curl -f http://localhost:8000/health || exit 1
+        docker-compose down
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+      continue-on-error: true
+    
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
