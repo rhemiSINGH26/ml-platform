@@ -1,24 +1,23 @@
 # Dockerfile for MLflow Tracking Server
+# Optimized for SQLite (no PostgreSQL dependencies needed)
 FROM python:3.10-slim
 
 WORKDIR /mlflow
 
-# Install system dependencies
+# Install minimal system dependencies (removed PostgreSQL client)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install MLflow and dependencies with timeout and retry settings
 ENV PIP_DEFAULT_TIMEOUT=300
 RUN pip install --no-cache-dir --retries 5 \
     mlflow==2.8.0 \
-    psycopg2-binary \
     boto3
 
-# Create directories for artifacts
-RUN mkdir -p /mlflow/artifacts
+# Create directories for artifacts and database
+RUN mkdir -p /mlflow/artifacts /data
 
 # Expose MLflow port
 EXPOSE 5000

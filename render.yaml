@@ -1,25 +1,8 @@
 # Render Blueprint Configuration for MLOps Platform
 # Deploy entire platform to Render.com with one click
+# Using SQLite for cost savings (~$0.25/month vs $7/month for PostgreSQL)
 
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: mlops-postgres
-    env: docker
-    plan: starter  # $7/month - upgrade to standard for production
-    region: oregon  # Choose closest to your users
-    envVars:
-      - key: POSTGRES_USER
-        value: mlops
-      - key: POSTGRES_PASSWORD
-        generateValue: true
-      - key: POSTGRES_DB
-        value: mlops
-    disk:
-      name: mlops-postgres-data
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 10
-
   # MLflow Tracking Server
   - type: web
     name: mlops-mlflow
@@ -29,15 +12,13 @@ services:
     region: oregon
     envVars:
       - key: MLFLOW_BACKEND_STORE_URI
-        fromDatabase:
-          name: mlops-postgres
-          property: connectionString
+        value: sqlite:////data/mlflow.db
       - key: MLFLOW_ARTIFACT_ROOT
-        value: /mlflow/artifacts
+        value: /data/artifacts
     disk:
-      name: mlflow-artifacts
-      mountPath: /mlflow/artifacts
-      sizeGB: 20
+      name: mlflow-data
+      mountPath: /data
+      sizeGB: 10
     healthCheckPath: /health
 
   # FastAPI Service
@@ -49,9 +30,7 @@ services:
     region: oregon
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: mlops-postgres
-          property: connectionString
+        value: sqlite:////data/audit.db
       - key: MLFLOW_TRACKING_URI
         fromService:
           name: mlops-mlflow
@@ -79,6 +58,10 @@ services:
         value: false
       - key: SLACK_WEBHOOK_URL
         sync: false
+    disk:
+      name: api-data
+      mountPath: /data
+      sizeGB: 1
     healthCheckPath: /health
     autoDeploy: true
 
@@ -114,9 +97,7 @@ services:
     region: oregon
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: mlops-postgres
-          property: connectionString
+        value: sqlite:////data/audit.db
       - key: MLFLOW_TRACKING_URI
         fromService:
           name: mlops-mlflow
@@ -135,10 +116,8 @@ services:
         value: production
       - key: LOG_LEVEL
         value: INFO
+    disk:
+      name: agent-data
+      mountPath: /data
+      sizeGB: 1
     autoDeploy: true
-
-databases:
-  - name: mlops-postgres
-    databaseName: mlops
-    user: mlops
-    plan: starter
