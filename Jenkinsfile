@@ -2,9 +2,8 @@ pipeline {
     agent any
     
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        GITHUB_TOKEN = credentials('github-token')
         DOCKER_BUILDKIT = '1'
+        DOCKERHUB_USER = 'rhemisingh26'
     }
     
     stages {
@@ -54,8 +53,8 @@ pipeline {
                         sh '''
                             docker build \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-api:${BUILD_NUMBER} \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-api:latest \
+                                -t ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-api:latest \
                                 -f Dockerfile.api \
                                 .
                         '''
@@ -68,8 +67,8 @@ pipeline {
                         sh '''
                             docker build \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-ui:${BUILD_NUMBER} \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-ui:latest \
+                                -t ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-ui:latest \
                                 -f Dockerfile.ui \
                                 .
                         '''
@@ -82,8 +81,8 @@ pipeline {
                         sh '''
                             docker build \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-agent:${BUILD_NUMBER} \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-agent:latest \
+                                -t ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-agent:latest \
                                 -f Dockerfile.agent \
                                 .
                         '''
@@ -96,8 +95,8 @@ pipeline {
                         sh '''
                             docker build \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-mlflow:${BUILD_NUMBER} \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-mlflow:latest \
+                                -t ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-mlflow:latest \
                                 -f Dockerfile.mlflow \
                                 .
                         '''
@@ -110,8 +109,8 @@ pipeline {
                         sh '''
                             docker build \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-training:${BUILD_NUMBER} \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/mlops-training:latest \
+                                -t ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-training:latest \
                                 -f Dockerfile.training \
                                 .
                         '''
@@ -123,38 +122,38 @@ pipeline {
         stage('Push Docker Images') {
             steps {
                 echo 'Logging in to Docker Hub...'
-                sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
-                
-                echo 'Pushing images to Docker Hub...'
-                sh '''
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-api:${BUILD_NUMBER}
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-api:latest
-                    
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-ui:${BUILD_NUMBER}
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-ui:latest
-                    
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-agent:${BUILD_NUMBER}
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-agent:latest
-                    
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-mlflow:${BUILD_NUMBER}
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-mlflow:latest
-                    
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-training:${BUILD_NUMBER}
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/mlops-training:latest
-                '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                  usernameVariable: 'DOCKER_USER', 
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        
+                        echo "Pushing images to Docker Hub..."
+                        docker push ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_USER}/mlops-api:latest
+                        
+                        docker push ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_USER}/mlops-ui:latest
+                        
+                        docker push ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_USER}/mlops-agent:latest
+                        
+                        docker push ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_USER}/mlops-mlflow:latest
+                        
+                        docker push ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_USER}/mlops-training:latest
+                        
+                        docker logout
+                    '''
+                }
             }
         }
         
         stage('Trigger Streamlit Deploy') {
             steps {
                 echo 'Streamlit Cloud will auto-deploy from main branch'
-                echo 'Pushing updated code to trigger deployment...'
-                sh '''
-                    git config user.name "Jenkins CI"
-                    git config user.email "jenkins@mlops.local"
-                    git tag -a "build-${BUILD_NUMBER}" -m "Jenkins build ${BUILD_NUMBER}"
-                    git push origin "build-${BUILD_NUMBER}" || echo "Tag push failed (may already exist)"
-                '''
+                echo "Build ${BUILD_NUMBER} completed successfully!"
             }
         }
     }
@@ -163,14 +162,13 @@ pipeline {
         success {
             echo '✅ Pipeline completed successfully!'
             echo "Docker images pushed with tags: ${BUILD_NUMBER} and latest"
+            echo "View images at: https://hub.docker.com/u/${DOCKERHUB_USER}"
         }
         failure {
             echo '❌ Pipeline failed!'
         }
         always {
             echo 'Cleaning up...'
-            sh 'docker logout || true'
-            cleanWs()
         }
     }
 }
