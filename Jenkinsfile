@@ -11,35 +11,33 @@ pipeline {
         stage('Environment Setup') {
             steps {
                 echo 'Setting up Python environment...'
-                dir("${WORKSPACE_DIR}") {
-                    sh '''
-                        python3 -m venv venv || true
-                        . venv/bin/activate
-                        pip install --upgrade pip
-                    '''
-                }
+                sh '''
+                    cd ${WORKSPACE_DIR}
+                    python3 -m venv venv || true
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                '''
             }
         }
         
         stage('Lint & Tests') {
             steps {
                 echo 'Running linting and tests...'
-                dir("${WORKSPACE_DIR}") {
-                    sh '''
-                        . venv/bin/activate
-                        pip install -q pytest flake8 black || true
-                        
-                        # Run linting (continue on error)
-                        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
-                        
-                        # Run tests if they exist
-                        if [ -d "tests" ]; then
-                            pytest -v tests/ || echo "Tests failed but continuing..."
-                        else
-                            echo "No tests directory found, skipping tests"
-                        fi
-                    '''
-                }
+                sh '''
+                    cd ${WORKSPACE_DIR}
+                    . venv/bin/activate
+                    pip install -q pytest flake8 black || true
+                    
+                    # Run linting (continue on error)
+                    flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+                    
+                    # Run tests if they exist
+                    if [ -d "tests" ]; then
+                        pytest -v tests/ || echo "Tests failed but continuing..."
+                    else
+                        echo "No tests directory found, skipping tests"
+                    fi
+                '''
             }
         }
         
@@ -48,114 +46,98 @@ pipeline {
                 stage('Build API') {
                     steps {
                         echo 'Building API Docker image...'
-                        dir("${WORKSPACE_DIR}") {
-                            sh '''
-                                docker build \
-                                    --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                    -t ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER} \
-                                    -t ${DOCKERHUB_USER}/mlops-api:latest \
-                                    -f Dockerfile.api \
-                                    .
-                            '''
-                        }
+                        sh '''
+                            cd ${WORKSPACE_DIR}
+                            sudo docker build \
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                -t ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-api:latest \
+                                -f Dockerfile.api \
+                                .
+                        '''
                     }
                 }
                 
                 stage('Build UI') {
                     steps {
                         echo 'Building UI Docker image...'
-                        dir("${WORKSPACE_DIR}") {
-                            sh '''
-                                docker build \
-                                    --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                    -t ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER} \
-                                    -t ${DOCKERHUB_USER}/mlops-ui:latest \
-                                    -f Dockerfile.ui \
-                                    .
-                            '''
-                        }
+                        sh '''
+                            cd ${WORKSPACE_DIR}
+                            sudo docker build \
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                -t ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-ui:latest \
+                                -f Dockerfile.ui \
+                                .
+                        '''
                     }
                 }
                 
                 stage('Build Agent') {
                     steps {
                         echo 'Building Agent Docker image...'
-                        dir("${WORKSPACE_DIR}") {
-                            sh '''
-                                docker build \
-                                    --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                    -t ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER} \
-                                    -t ${DOCKERHUB_USER}/mlops-agent:latest \
-                                    -f Dockerfile.agent \
-                                    .
-                            '''
-                        }
+                        sh '''
+                            cd ${WORKSPACE_DIR}
+                            sudo docker build \
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                -t ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-agent:latest \
+                                -f Dockerfile.agent \
+                                .
+                        '''
                     }
                 }
                 
                 stage('Build MLflow') {
                     steps {
                         echo 'Building MLflow Docker image...'
-                        dir("${WORKSPACE_DIR}") {
-                            sh '''
-                                docker build \
-                                    --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                    -t ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER} \
-                                    -t ${DOCKERHUB_USER}/mlops-mlflow:latest \
-                                    -f Dockerfile.mlflow \
-                                    .
-                            '''
-                        }
+                        sh '''
+                            cd ${WORKSPACE_DIR}
+                            sudo docker build \
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                -t ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-mlflow:latest \
+                                -f Dockerfile.mlflow \
+                                .
+                        '''
                     }
                 }
                 
                 stage('Build Training') {
                     steps {
                         echo 'Building Training Docker image...'
-                        dir("${WORKSPACE_DIR}") {
-                            sh '''
-                                docker build \
-                                    --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                    -t ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER} \
-                                    -t ${DOCKERHUB_USER}/mlops-training:latest \
-                                    -f Dockerfile.training \
-                                    .
-                            '''
-                        }
+                        sh '''
+                            cd ${WORKSPACE_DIR}
+                            sudo docker build \
+                                --build-arg BUILDKIT_INLINE_CACHE=1 \
+                                -t ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER} \
+                                -t ${DOCKERHUB_USER}/mlops-training:latest \
+                                -f Dockerfile.training \
+                                .
+                        '''
                     }
                 }
             }
         }
         
-        stage('Push Docker Images') {
+        stage('Push to Docker Hub') {
             steps {
-                echo 'Logging in to Docker Hub...'
-                dir("${WORKSPACE_DIR}") {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                      usernameVariable: 'DOCKER_USER', 
-                                                      passwordVariable: 'DOCKER_PASS')]) {
-                        sh '''
-                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                            
-                            echo "Pushing images to Docker Hub..."
-                            docker push ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USER}/mlops-api:latest
-                            
-                            docker push ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USER}/mlops-ui:latest
-                            
-                            docker push ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USER}/mlops-agent:latest
-                            
-                            docker push ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USER}/mlops-mlflow:latest
-                            
-                            docker push ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER}
-                            docker push ${DOCKERHUB_USER}/mlops-training:latest
-                            
-                            docker logout
-                        '''
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                usernameVariable: 'DOCKER_USER', 
+                                                passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo $DOCKER_PASS | sudo docker login -u $DOCKER_USER --password-stdin
+                        sudo docker push ${DOCKERHUB_USER}/mlops-api:${BUILD_NUMBER}
+                        sudo docker push ${DOCKERHUB_USER}/mlops-api:latest
+                        sudo docker push ${DOCKERHUB_USER}/mlops-ui:${BUILD_NUMBER}
+                        sudo docker push ${DOCKERHUB_USER}/mlops-ui:latest
+                        sudo docker push ${DOCKERHUB_USER}/mlops-agent:${BUILD_NUMBER}
+                        sudo docker push ${DOCKERHUB_USER}/mlops-agent:latest
+                        sudo docker push ${DOCKERHUB_USER}/mlops-mlflow:${BUILD_NUMBER}
+                        sudo docker push ${DOCKERHUB_USER}/mlops-mlflow:latest
+                        sudo docker push ${DOCKERHUB_USER}/mlops-training:${BUILD_NUMBER}
+                        sudo docker push ${DOCKERHUB_USER}/mlops-training:latest
+                    '''
                 }
             }
         }
