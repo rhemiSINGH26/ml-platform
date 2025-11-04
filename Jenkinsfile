@@ -158,37 +158,11 @@ pipeline {
         
         stage('Push to Docker Hub') {
             steps {
-                echo '📤 Pushing images to Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                usernameVariable: 'DOCKER_USER', 
-                                                passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "Logging into Docker Hub..."
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        
-                        echo "Pushing API images..."
-                        docker push ${API_IMAGE}:${IMAGE_TAG}
-                        docker push ${API_IMAGE}:latest
-                        
-                        echo "Pushing UI images..."
-                        docker push ${UI_IMAGE}:${IMAGE_TAG}
-                        docker push ${UI_IMAGE}:latest
-                        
-                        echo "Pushing Agent images..."
-                        docker push ${AGENT_IMAGE}:${IMAGE_TAG}
-                        docker push ${AGENT_IMAGE}:latest
-                        
-                        echo "Pushing MLflow images..."
-                        docker push ${MLFLOW_IMAGE}:${IMAGE_TAG}
-                        docker push ${MLFLOW_IMAGE}:latest
-                        
-                        echo "Pushing Training images..."
-                        docker push ${TRAINING_IMAGE}:${IMAGE_TAG}
-                        docker push ${TRAINING_IMAGE}:latest
-                        
-                        echo "✓ All images pushed successfully"
-                    '''
-                }
+                echo '⏭️  Skipping Docker Hub push (local deployment only)...'
+                sh '''
+                    echo "Images built successfully for local use:"
+                    docker images | grep mlops | grep ${IMAGE_TAG}
+                '''
             }
         }
         
