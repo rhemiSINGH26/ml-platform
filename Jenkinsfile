@@ -88,7 +88,7 @@ pipeline {
                     steps {
                         echo '🐳 Building API image...'
                         sh '''
-                            sudo docker build -f Dockerfile.api \
+                            docker build -f Dockerfile.api \
                                 -t ${API_IMAGE}:${IMAGE_TAG} \
                                 -t ${API_IMAGE}:latest \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -102,7 +102,7 @@ pipeline {
                     steps {
                         echo '🐳 Building UI image...'
                         sh '''
-                            sudo docker build -f Dockerfile.ui \
+                            docker build -f Dockerfile.ui \
                                 -t ${UI_IMAGE}:${IMAGE_TAG} \
                                 -t ${UI_IMAGE}:latest \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -116,7 +116,7 @@ pipeline {
                     steps {
                         echo '🐳 Building Agent image...'
                         sh '''
-                            sudo docker build -f Dockerfile.agent \
+                            docker build -f Dockerfile.agent \
                                 -t ${AGENT_IMAGE}:${IMAGE_TAG} \
                                 -t ${AGENT_IMAGE}:latest \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -130,7 +130,7 @@ pipeline {
                     steps {
                         echo '🐳 Building MLflow image...'
                         sh '''
-                            sudo docker build -f Dockerfile.mlflow \
+                            docker build -f Dockerfile.mlflow \
                                 -t ${MLFLOW_IMAGE}:${IMAGE_TAG} \
                                 -t ${MLFLOW_IMAGE}:latest \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -144,7 +144,7 @@ pipeline {
                     steps {
                         echo '🐳 Building Training image...'
                         sh '''
-                            sudo docker build -f Dockerfile.training \
+                            docker build -f Dockerfile.training \
                                 -t ${TRAINING_IMAGE}:${IMAGE_TAG} \
                                 -t ${TRAINING_IMAGE}:latest \
                                 --build-arg BUILDKIT_INLINE_CACHE=1 \
@@ -164,27 +164,27 @@ pipeline {
                                                 passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo "Logging into Docker Hub..."
-                        echo $DOCKER_PASS | sudo docker login -u $DOCKER_USER --password-stdin
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                         
                         echo "Pushing API images..."
-                        sudo docker push ${API_IMAGE}:${IMAGE_TAG}
-                        sudo docker push ${API_IMAGE}:latest
+                        docker push ${API_IMAGE}:${IMAGE_TAG}
+                        docker push ${API_IMAGE}:latest
                         
                         echo "Pushing UI images..."
-                        sudo docker push ${UI_IMAGE}:${IMAGE_TAG}
-                        sudo docker push ${UI_IMAGE}:latest
+                        docker push ${UI_IMAGE}:${IMAGE_TAG}
+                        docker push ${UI_IMAGE}:latest
                         
                         echo "Pushing Agent images..."
-                        sudo docker push ${AGENT_IMAGE}:${IMAGE_TAG}
-                        sudo docker push ${AGENT_IMAGE}:latest
+                        docker push ${AGENT_IMAGE}:${IMAGE_TAG}
+                        docker push ${AGENT_IMAGE}:latest
                         
                         echo "Pushing MLflow images..."
-                        sudo docker push ${MLFLOW_IMAGE}:${IMAGE_TAG}
-                        sudo docker push ${MLFLOW_IMAGE}:latest
+                        docker push ${MLFLOW_IMAGE}:${IMAGE_TAG}
+                        docker push ${MLFLOW_IMAGE}:latest
                         
                         echo "Pushing Training images..."
-                        sudo docker push ${TRAINING_IMAGE}:${IMAGE_TAG}
-                        sudo docker push ${TRAINING_IMAGE}:latest
+                        docker push ${TRAINING_IMAGE}:${IMAGE_TAG}
+                        docker push ${TRAINING_IMAGE}:latest
                         
                         echo "✓ All images pushed successfully"
                     '''
@@ -196,10 +196,10 @@ pipeline {
             steps {
                 echo '🛑 Stopping old services...'
                 sh '''
-                    sudo docker-compose down --remove-orphans || echo "No services running"
+                    docker-compose down --remove-orphans || echo "No services running"
                     
                     # Clean up dangling images
-                    sudo docker image prune -f || true
+                    docker image prune -f || true
                 '''
             }
         }
@@ -209,13 +209,13 @@ pipeline {
                 echo '🚀 Deploying services with docker-compose...'
                 sh '''
                     # Start core services (api, ui, mlflow, agent)
-                    sudo docker-compose up -d api ui mlflow agent
+                    docker-compose up -d api ui mlflow agent
                     
                     echo "Waiting for services to start..."
                     sleep 15
                     
                     # Check service status
-                    sudo docker-compose ps
+                    docker-compose ps
                 '''
             }
         }
@@ -257,10 +257,10 @@ pipeline {
                     echo "Workspace:    ${WORKSPACE}"
                     echo ""
                     echo "Docker Images Built:"
-                    sudo docker images | grep mlops | head -10
+                    docker images | grep mlops | head -10
                     echo ""
                     echo "Running Services:"
-                    sudo docker-compose ps
+                    docker-compose ps
                     echo ""
                     echo "Service URLs (Local):"
                     echo "  🌐 API:        http://localhost:8000"
@@ -318,13 +318,13 @@ pipeline {
             echo 'Collecting logs for debugging...'
             sh '''
                 echo "Docker Compose Logs:"
-                sudo docker-compose logs --tail=100 || true
+                docker-compose logs --tail=100 || true
                 echo ""
                 echo "Docker Containers:"
-                sudo docker ps -a
+                docker ps -a
                 echo ""
                 echo "Docker Images:"
-                sudo docker images | grep mlops || true
+                docker images | grep mlops || true
                 echo ""
                 echo "Workspace contents:"
                 ls -la
@@ -338,7 +338,7 @@ pipeline {
                 # Only cleanup build artifacts and old images
                 
                 # Remove old/dangling images (keep latest and current build)
-                sudo docker image prune -f || true
+                docker image prune -f || true
                 
                 # Clean up any test artifacts
                 rm -rf .pytest_cache __pycache__ .coverage || true
