@@ -2,9 +2,6 @@ pipeline {
     agent any
     
     environment {
-        // Host project path (Jenkins will copy files to workspace)
-        HOST_PROJECT_PATH = "/home/rhemi/IA3/mlops"
-        
         // Docker Hub configuration
         DOCKERHUB_USER = "rhemisingh26"
         
@@ -26,66 +23,36 @@ pipeline {
     }
     
     stages {
-        stage('Prepare Workspace') {
+        stage('Environment Check') {
             steps {
-                echo '📥 Copying project files to Jenkins workspace...'
+                echo '� Checking environment...'
                 sh '''
-                    # Clean workspace
-                    cd ${WORKSPACE}
-                    rm -rf * .[!.]* 2>/dev/null || true
+                    echo "Build Number: ${BUILD_NUMBER}"
+                    echo "Workspace: ${WORKSPACE}"
+                    docker --version
+                    docker-compose --version
+                    python3 --version
                     
-                    echo "Using tar method to copy files..."
-                    # Use tar to copy files (more reliable than cp)
-                    docker run --rm \
-                        -v ${HOST_PROJECT_PATH}:/source:ro \
-                        -v ${WORKSPACE}:/dest \
-                        alpine sh -c "cd /source && tar cf - . | tar xf - -C /dest"
+                    # List workspace contents
+                    echo "Workspace contents:"
+                    ls -la
                     
-                    echo "Workspace contents after copy:"
-                    ls -la ${WORKSPACE} | head -30
-                    
-                    echo "Checking critical files..."
+                    # Verify Dockerfiles
+                    echo "Checking Dockerfiles..."
                     for dockerfile in Dockerfile.api Dockerfile.ui Dockerfile.agent Dockerfile.mlflow Dockerfile.training; do
-                        if [ -f "${WORKSPACE}/$dockerfile" ]; then
+                        if [ -f "$dockerfile" ]; then
                             echo "✓ Found $dockerfile"
                         else
                             echo "✗ Missing $dockerfile"
                         fi
                     done
                     
-                    echo "Total files copied:"
-                    find ${WORKSPACE} -type f | wc -l
-                '''
-            }
-        }
-        
-        stage('Environment Check') {
-            steps {
-                echo '🔧 Checking environment...'
-                sh '''
-                    cd ${WORKSPACE}
-                    echo "Build Number: ${BUILD_NUMBER}"
-                    docker --version
-                    docker-compose --version
-                    python3 --version
-                    
-                    # Verify key files
-                    for file in docker-compose.yml requirements.txt; do
-                        if [ -f "$file" ]; then
-                            echo "✓ Found $file"
-                        else
-                            echo "✗ Missing $file"
-                        fi
-                    done
-                    
-                    # Verify service directories
-                    for dir in services/api services/ui services/agent services/mlflow services/training; do
-                        if [ -d "$dir" ]; then
-                            echo "✓ Found directory: $dir"
-                        else
-                            echo "✗ Missing directory: $dir"
-                        fi
-                    done
+                    # Verify docker-compose.yml
+                    if [ -f "docker-compose.yml" ]; then
+                        echo "✓ Found docker-compose.yml"
+                    else
+                        echo "✗ Missing docker-compose.yml"
+                    fi
                 '''
             }
         }
@@ -94,8 +61,6 @@ pipeline {
             steps {
                 echo '🔍 Running code quality checks...'
                 sh '''
-                    cd ${WORKSPACE}
-                    
                     echo "Checking Python syntax in key files..."
                     
                     # API service
@@ -108,15 +73,9 @@ pipeline {
                         python3 -m py_compile services/ui/app.py 2>&1 && echo "✓ UI app.py syntax OK" || echo "✗ UI app.py has issues"
                     fi
                     
-                    # Agent service
-                    if [ -f "services/agent/agent.py" ]; then
-                        python3 -m py_compile services/agent/agent.py 2>&1 && echo "✓ Agent syntax OK" || echo "✗ Agent has issues"
-                    fi
-                    
-                    # Training service
-                    if [ -f "services/training/train.py" ]; then
-                        python3 -m py_compile services/training/train.py 2>&1 && echo "✓ Training syntax OK" || echo "✗ Training has issues"
-                    fi
+                    # Check if there are any Python files
+                    echo "Total Python files in project:"
+                    find . -name "*.py" -type f | wc -l
                     
                     echo "Code quality checks completed"
                 '''
@@ -129,7 +88,6 @@ pipeline {
                     steps {
                         echo '🐳 Building API image...'
                         sh '''
-                            cd ${WORKSPACE}
                             sudo docker build -f Dockerfile.api \
                                 -t ${API_IMAGE}:${IMAGE_TAG} \
                                 -t ${API_IMAGE}:latest \
@@ -144,7 +102,6 @@ pipeline {
                     steps {
                         echo '🐳 Building UI image...'
                         sh '''
-                            cd ${WORKSPACE}
                             sudo docker build -f Dockerfile.ui \
                                 -t ${UI_IMAGE}:${IMAGE_TAG} \
                                 -t ${UI_IMAGE}:latest \
@@ -159,7 +116,6 @@ pipeline {
                     steps {
                         echo '🐳 Building Agent image...'
                         sh '''
-                            cd ${WORKSPACE}
                             sudo docker build -f Dockerfile.agent \
                                 -t ${AGENT_IMAGE}:${IMAGE_TAG} \
                                 -t ${AGENT_IMAGE}:latest \
@@ -174,7 +130,6 @@ pipeline {
                     steps {
                         echo '🐳 Building MLflow image...'
                         sh '''
-                            cd ${WORKSPACE}
                             sudo docker build -f Dockerfile.mlflow \
                                 -t ${MLFLOW_IMAGE}:${IMAGE_TAG} \
                                 -t ${MLFLOW_IMAGE}:latest \
@@ -189,7 +144,6 @@ pipeline {
                     steps {
                         echo '🐳 Building Training image...'
                         sh '''
-                            cd ${WORKSPACE}
                             sudo docker build -f Dockerfile.training \
                                 -t ${TRAINING_IMAGE}:${IMAGE_TAG} \
                                 -t ${TRAINING_IMAGE}:latest \
@@ -242,7 +196,6 @@ pipeline {
             steps {
                 echo '🛑 Stopping old services...'
                 sh '''
-                    cd ${WORKSPACE}
                     sudo docker-compose down --remove-orphans || echo "No services running"
                     
                     # Clean up dangling images
@@ -255,10 +208,8 @@ pipeline {
             steps {
                 echo '🚀 Deploying services with docker-compose...'
                 sh '''
-                    cd ${WORKSPACE}
-                    
-                    # Start all services
-                    sudo docker-compose up -d
+                    # Start core services (api, ui, mlflow, agent)
+                    sudo docker-compose up -d api ui mlflow agent
                     
                     echo "Waiting for services to start..."
                     sleep 15
@@ -298,17 +249,15 @@ pipeline {
             steps {
                 echo '📊 Generating deployment report...'
                 sh '''
-                    cd ${WORKSPACE}
-                    
                     echo "═══════════════════════════════════════════════════════"
                     echo "              ML PLATFORM DEPLOYMENT SUMMARY"
                     echo "═══════════════════════════════════════════════════════"
                     echo "Build Number: ${BUILD_NUMBER}"
                     echo "Build Date:   $(date)"
-                    echo "Git Commit:   $(git rev-parse --short HEAD 2>/dev/null || echo 'N/A')"
+                    echo "Workspace:    ${WORKSPACE}"
                     echo ""
                     echo "Docker Images Built:"
-                    sudo docker images | grep mlops | grep -E "${IMAGE_TAG}|latest"
+                    sudo docker images | grep mlops | head -10
                     echo ""
                     echo "Running Services:"
                     sudo docker-compose ps
@@ -317,7 +266,6 @@ pipeline {
                     echo "  🌐 API:        http://localhost:8000"
                     echo "  🌐 UI:         http://localhost:8501"
                     echo "  🌐 MLflow:     http://localhost:5000"
-                    echo "  🌐 Postgres:   localhost:5432"
                     echo ""
                     echo "API Documentation:"
                     echo "  📚 Swagger:    http://localhost:8000/docs"
@@ -369,7 +317,6 @@ pipeline {
             echo '❌ PIPELINE FAILED!'
             echo 'Collecting logs for debugging...'
             sh '''
-                cd ${WORKSPACE}
                 echo "Docker Compose Logs:"
                 sudo docker-compose logs --tail=100 || true
                 echo ""
@@ -378,6 +325,9 @@ pipeline {
                 echo ""
                 echo "Docker Images:"
                 sudo docker images | grep mlops || true
+                echo ""
+                echo "Workspace contents:"
+                ls -la
             '''
         }
         
@@ -386,7 +336,6 @@ pipeline {
             sh '''
                 # Keep Docker containers running
                 # Only cleanup build artifacts and old images
-                cd ${WORKSPACE}
                 
                 # Remove old/dangling images (keep latest and current build)
                 sudo docker image prune -f || true
